@@ -129,7 +129,7 @@
       <xsl:with-param name="pid" select="$pid"/>
       <xsl:with-param name="datastream" select="$datastream"/>
     </xsl:call-template>
-  </xsl:template> 
+  </xsl:template>
 
   <!-- Intercept names with role terms, so we can create copies of the fields
     including the role term in the name of generated fields. (Hurray, additional
