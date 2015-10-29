@@ -5,7 +5,7 @@
   xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
   xmlns:foxml="info:fedora/fedora-system:def/foxml#"
   xmlns:mods="http://www.loc.gov/mods/v3"
-     exclude-result-prefixes="mods java">
+     exclude-result-prefixes="mods java mads xalan">
   <!-- <xsl:include href="/usr/local/fedora/tomcat/webapps/fedoragsearch/WEB-INF/classes/config/index/FgsIndex/islandora_transforms/library/xslt-date-template.xslt"/>-->
   <xsl:include href="/usr/local/fedora/tomcat/webapps/fedoragsearch/WEB-INF/classes/fgsconfigFinal/index/FgsIndex/islandora_transforms/library/xslt-date-template.xslt"/>
   <!-- <xsl:include href="/usr/local/fedora/tomcat/webapps/fedoragsearch/WEB-INF/classes/config/index/FgsIndex/islandora_transforms/manuscript_finding_aid.xslt"/> -->
@@ -200,7 +200,7 @@
     </xsl:if>
   </xsl:template>
 
-   <!-- Want to include language in field names. -->
+  <!-- Want to include language in field names. -->
   <xsl:template name="mods_language_fork">
     <xsl:param name="prefix"/>
     <xsl:param name="suffix"/>
@@ -277,6 +277,44 @@
         </xsl:attribute>
         <xsl:value-of select="$node/@valueURI"/>
       </field>
+
+      <!-- Referenced fields. -->
+      <xsl:variable name="referenced_pid" select="substring-after($node/@valueURI, 'object/')"/>
+      <!-- Language reference. -->
+      <xsl:if test="../mods:languageTerm[@authority='aillaLanguage']">
+        <xsl:variable name="referenced_language_doc" select="document(concat($PROT, '://', encoder:encode($FEDORAUSER), ':', encoder:encode($FEDORAPASS), '@', $HOST, ':', $PORT, '/fedora/objects/', $referenced_pid, '/datastreams/LANGUAGE/content'))"/>
+        <!-- Referenced aillaEngName as label. -->
+        <xsl:if test="$referenced_language_doc//aillaEngName">
+          <field>
+            <xsl:attribute name="name">
+              <xsl:value-of select="concat($prefix, 'valueURI_referenced_aillaEngName_', $suffix)"/>
+            </xsl:attribute>
+            <xsl:value-of select="$referenced_language_doc//aillaEngName"/>
+          </field>
+        </xsl:if>
+        <!-- Referenced aillaLangCode as code. -->
+        <xsl:if test="$referenced_language_doc//aillaLangCode">
+          <field>
+            <xsl:attribute name="name">
+              <xsl:value-of select="concat($prefix, 'valueURI_referenced_aillaLangCode_', $suffix)"/>
+            </xsl:attribute>
+            <xsl:value-of select="$referenced_language_doc//aillaLangCode"/>
+          </field>
+        </xsl:if>
+      </xsl:if>
+
+      <!-- Country reference. -->
+      <xsl:if test="../mods:placeTerm[@authority='aillaCountry']">
+        <xsl:variable name="referenced_country_doc" select="document(concat($PROT, '://', encoder:encode($FEDORAUSER), ':', encoder:encode($FEDORAPASS), '@', $HOST, ':', $PORT, '/fedora/objects/', $referenced_pid, '/datastreams/MADS/content'))"/>
+        <xsl:if test="$referenced_country_doc//mads:authority/mads:geographic[@lang='eng']">
+          <field>
+            <xsl:attribute name="name">
+              <xsl:value-of select="concat($prefix, 'valueURI_referenced_geographic_eng_', $suffix)"/>
+            </xsl:attribute>
+            <xsl:value-of select="$referenced_country_doc//mads:authority/mads:geographic[@lang='eng']"/>
+          </field>
+        </xsl:if>
+      </xsl:if>
     </xsl:if>
 
     <xsl:apply-templates select="$node/*" mode="slurping_MODS">
