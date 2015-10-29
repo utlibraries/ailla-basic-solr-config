@@ -5,6 +5,9 @@
   xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
   xmlns:foxml="info:fedora/fedora-system:def/foxml#"
   xmlns:mods="http://www.loc.gov/mods/v3"
+  xmlns:mads="http://www.loc.gov/mads/v2"
+  xmlns:xalan="http://xml.apache.org/xalan"
+  xmlns:encoder="xalan://java.net.URLEncoder"
      exclude-result-prefixes="mods java">
   <!-- <xsl:include href="/usr/local/fedora/tomcat/webapps/fedoragsearch/WEB-INF/classes/config/index/FgsIndex/islandora_transforms/library/xslt-date-template.xslt"/>-->
   <xsl:include href="/usr/local/fedora/tomcat/webapps/fedoragsearch/WEB-INF/classes/fgsconfigFinal/index/FgsIndex/islandora_transforms/library/xslt-date-template.xslt"/>
@@ -128,6 +131,27 @@
     </xsl:call-template>
   </xsl:template>
 
+  <!--
+    The "eventType" attribute was introduce with MODS 3.5... Let's start
+    exposing it for use.
+  -->
+  <xsl:template match="mods:originInfo" mode="slurping_MODS">
+    <xsl:param name="prefix"/>
+    <xsl:param name="suffix"/>
+    <xsl:param name="pid">not provided</xsl:param>
+    <xsl:param name="datastream">not provided</xsl:param>
+    <xsl:variable name="lowercase" select="'abcdefghijklmnopqrstuvwxyz_'" />
+    <xsl:variable name="uppercase" select="'ABCDEFGHIJKLMNOPQRSTUVWXYZ '" />
+
+    <xsl:call-template name="mods_eventType_fork">
+      <xsl:with-param name="prefix" select="concat($prefix, local-name(), '_')"/>
+      <xsl:with-param name="suffix" select="$suffix"/>
+      <xsl:with-param name="value" select="normalize-space(text())"/>
+      <xsl:with-param name="pid" select="$pid"/>
+      <xsl:with-param name="datastream" select="$datastream"/>
+    </xsl:call-template>
+  </xsl:template>
+
   <!-- Intercept names with role terms, so we can create copies of the fields
     including the role term in the name of generated fields. (Hurray, additional
     specificity!) -->
@@ -200,7 +224,39 @@
     </xsl:if>
   </xsl:template>
 
-   <!-- Want to include language in field names. -->
+  <!-- Fork on eventType to preserve legacy field names. -->
+  <xsl:template name="mods_eventType_fork">
+    <xsl:param name="prefix"/>
+    <xsl:param name="suffix"/>
+    <xsl:param name="value"/>
+    <xsl:param name="pid">not provided</xsl:param>
+    <xsl:param name="datastream">not provided</xsl:param>
+    <xsl:param name="node" select="current()"/>
+    <xsl:variable name="lowercase" select="'abcdefghijklmnopqrstuvwxyz_'" />
+    <xsl:variable name="uppercase" select="'ABCDEFGHIJKLMNOPQRSTUVWXYZ '" />
+
+    <xsl:call-template name="mods_language_fork">
+      <xsl:with-param name="prefix" select="$prefix"/>
+      <xsl:with-param name="suffix" select="$suffix"/>
+      <xsl:with-param name="value" select="$value"/>
+      <xsl:with-param name="pid" select="$pid"/>
+      <xsl:with-param name="datastream" select="$datastream"/>
+      <xsl:with-param name="node" select="$node"/>
+    </xsl:call-template>
+
+    <xsl:if test="@eventType">
+      <xsl:call-template name="mods_language_fork">
+        <xsl:with-param name="prefix" select="concat($prefix, 'eventType_', translate(@eventType, $uppercase, $lowercase), '_')"/>
+        <xsl:with-param name="suffix" select="$suffix"/>
+        <xsl:with-param name="value" select="$value"/>
+        <xsl:with-param name="pid" select="$pid"/>
+        <xsl:with-param name="datastream" select="$datastream"/>
+        <xsl:with-param name="node" select="$node"/>
+      </xsl:call-template>
+    </xsl:if>
+  </xsl:template>
+
+  <!-- Want to include language in field names. -->
   <xsl:template name="mods_language_fork">
     <xsl:param name="prefix"/>
     <xsl:param name="suffix"/>
@@ -269,6 +325,52 @@
         </xsl:attribute>
         <xsl:value-of select="$node/@authorityURI"/>
       </field>
+    </xsl:if>
+    <xsl:if test="normalize-space($node/@valueURI)">
+      <field>
+        <xsl:attribute name="name">
+          <xsl:value-of select="concat($prefix, 'valueURI_', $suffix)"/>
+        </xsl:attribute>
+        <xsl:value-of select="$node/@valueURI"/>
+      </field>
+
+      <!-- Referenced fields. -->
+      <xsl:variable name="referenced_pid" select="substring-after($node/@valueURI, 'object/')"/>
+      <!-- Language reference. -->
+      <xsl:if test="../mods:languageTerm[@authority='aillaLanguage']">
+        <xsl:variable name="referenced_language_doc" select="document(concat($PROT, '://', encoder:encode($FEDORAUSER), ':', encoder:encode($FEDORAPASS), '@', $HOST, ':', $PORT, '/fedora/objects/', $referenced_pid, '/datastreams/LANGUAGE/content'))"/>
+        <!-- Referenced aillaEngName as label. -->
+        <xsl:if test="$referenced_language_doc//aillaEngName">
+          <field>
+            <xsl:attribute name="name">
+              <xsl:value-of select="concat($prefix, 'valueURI_referenced_aillaEngName_', $suffix)"/>
+            </xsl:attribute>
+            <xsl:value-of select="$referenced_language_doc//aillaEngName"/>
+          </field>
+        </xsl:if>
+        <!-- Referenced aillaLangCode as code. -->
+        <xsl:if test="$referenced_language_doc//aillaLangCode">
+          <field>
+            <xsl:attribute name="name">
+              <xsl:value-of select="concat($prefix, 'valueURI_referenced_aillaLangCode_', $suffix)"/>
+            </xsl:attribute>
+            <xsl:value-of select="$referenced_language_doc//aillaLangCode"/>
+          </field>
+        </xsl:if>
+      </xsl:if>
+
+      <!-- Country reference. -->
+      <xsl:if test="../mods:placeTerm[@authority='aillaCountry']">
+        <xsl:variable name="referenced_country_doc" select="document(concat($PROT, '://', encoder:encode($FEDORAUSER), ':', encoder:encode($FEDORAPASS), '@', $HOST, ':', $PORT, '/fedora/objects/', $referenced_pid, '/datastreams/MADS/content'))"/>
+        <xsl:if test="$referenced_country_doc//mads:authority/mads:geographic[@lang='eng']">
+          <field>
+            <xsl:attribute name="name">
+              <xsl:value-of select="concat($prefix, 'valueURI_referenced_geographic_eng_', $suffix)"/>
+            </xsl:attribute>
+            <xsl:value-of select="$referenced_country_doc//mads:authority/mads:geographic[@lang='eng']"/>
+          </field>
+        </xsl:if>
+      </xsl:if>
     </xsl:if>
 
     <xsl:apply-templates select="$node/*" mode="slurping_MODS">
