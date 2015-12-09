@@ -31,7 +31,7 @@
 
     <xsl:if test="not(contains(@MIMETYPE, 'xml')) and @MIMETYPE != ''">
       <field name="fedora_non_xml_mime_ms">
-        <xsl:value-of select="@MIMETYPE"/>
+        <xsl:value-of select="substring-after(@MIMETYPE, '/')"/>
       </field>
     </xsl:if>
     <xsl:for-each select="$element/@*">
