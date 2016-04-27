@@ -201,12 +201,14 @@
     <fieldType name="moreSortableString" class="solr.TextField">
       <analyzer>
         <charFilter class="solr.PatternReplaceCharFilterFactory" pattern="^(?:(?i:a|an|the)\b\s)((\s*\S+)+\s*)$" replacement="$1"/>
-        <charFilter class="solr.MappingCharFilterFactory" mapping="mapping-ISOLatin1Accent.txt"/>
         <tokenizer class="solr.KeywordTokenizerFactory"/>
-        <filter class="solr.LowerCaseFilterFactory"/>
         <filter class="solr.PatternReplaceFilterFactory" pattern="[-/\\–—]" replacement=" "/>
         <filter class="solr.PatternReplaceFilterFactory" pattern="\s+" replacement=" "/>
         <filter class="solr.PatternReplaceFilterFactory" pattern="[\.,;:()\[\]&lt;&gt;{}'&quot;!?]" replacement=""/>
+        <!-- "The Unicode default, or "ROOT" Locale, has rules that are
+          designed to work well in general for most languages. To use it,
+          simply define the language as the empty string." -->
+        <filter class="solr.CollationKeyFilterFactory" language="" strength="secondary"/>
       </analyzer>
     </fieldType>
 
